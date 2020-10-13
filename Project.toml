@@ -1,0 +1,4 @@
+name = "TikhonovEnsembleKalmanSampling"
+uuid = "0022ac87-c48b-460a-960a-35266a49fdc8"
+authors = ["Jack B. Muir <jmuir@caltech.edu>"]
+version = "0.1.0"
