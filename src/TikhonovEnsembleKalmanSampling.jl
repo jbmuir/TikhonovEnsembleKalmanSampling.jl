@@ -3,10 +3,10 @@ module TikhonovEnsembleKalmanSampling
 using Distributed
 using Statistics
 using LinearAlgebra
+using Optim
 
-include("inversion.jl")
 include("sampling.jl")
 
-export teki, whteki
+export teks, whteks
 
 end # module
