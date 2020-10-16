@@ -45,9 +45,10 @@ function teks(u::Array{T,2}, y, Γ⁻¹, C₀⁻¹, G, n_steps;
     end
 end
 
-function implicit_hyper_solve(θ, Δθ, Cθ, hₙ, ∇nlpθ_fun)
+function implicit_hyper_solve(θΔθ, Cθ, hₙ, ∇nlpθ_fun; solver=NelderMead())
+    θ, Δθ = θΔθ
     # ∇nlpθ_fun = gradient of negative log prior in respect to θ
-    res = optimize(θ̂ -> sum((θ̂ .+ hₙ*Cθ*∇nlpθ_fun(θ̂) - Δθ).^2), θ)
+    res = optimize(θ̂ -> sum((θ̂ .+ hₙ*Cθ*∇nlpθ_fun(θ̂) - Δθ).^2), θ[:], solver)
     return Optim.minimizer(res)
 end
 
@@ -57,13 +58,15 @@ function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_fun, n_
                 iδ=100, 
                 λ=1, 
                 ϵ=convert(T, 1e-10), 
-                savechain=false) where T
+                savechain=false,
+                hyper_solver=NelderMead()) where T
     
     if savechain
         ξchain = Array{T,2}[]
         θchain = Array{T,2}[]
     end
     hₙchain = T[]
+    J = size(ξ, 2)
     for i = 1:n_steps
         #calculate i-step sample covariance in parameter space & update parameters
         ξ̄ = mean(ξ, dims=2)
@@ -90,18 +93,18 @@ function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_fun, n_
         ξ = I∇Rξ \ Dξ
         if parallel
             θ = reduce(hcat, 
-                       pmap((x,y)->implicit_hyper_solve(x, y, Cθ, hₙ, ∇nlpθ_fun),  
-                       zip(eachcol(θ), eachcol(Dθ))))
+                       pmap(θDθ->implicit_hyper_solve(θDθ, Cθ, hₙ, ∇nlpθ_fun, solver=hyper_solver),  
+                       zip(eachcol(θ), eachcol(Dθ))))    
         else
             θ = reduce(hcat, 
-                       map((x,y)->implicit_hyper_solve(x, y, Cθ, hₙ, ∇nlpθ_fun),  
+                       map(θDθ->implicit_hyper_solve(θDθ, Cθ, hₙ, ∇nlpθ_fun, solver=hyper_solver),  
                        zip(eachcol(θ), eachcol(Dθ))))        
         end        
         # perturb parameters according to i-step sample covariance
         Wξ = randn(T, size(ξ))
         Wθ = randn(T, size(θ))
-        ξ .+= sqrt(2*hₙ)*Cξ.U*Wξ
-        θ .+= sqrt(2*hₙ)*Cθ.U*Wθ
+        ξ .+= sqrt(2*hₙ)*Cξc.U*Wξ
+        θ .+= sqrt(2*hₙ)*Cθc.U*Wθ
         if savechain
             push!(ξchain, ξ)
             push!(θchain, θ)
