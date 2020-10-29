@@ -25,7 +25,8 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     hₙ = h₀ / (norm(D) + 1/iδ)
     Du = u .- ((hₙ/J)*D*u')'
     #Implicit solve of partial step
-    I∇R = cholesky(I + hₙ*∇R)
+    # I∇R = cholesky(Symmetric(I + hₙ*∇R))
+    I∇R = I + hₙ*∇R
     u = I∇R \ Du
     # perturb parameters according to i-step sample covariance
     Wu = randn(T, size(u))
@@ -99,7 +100,8 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun;
     Dξ = ξ .- ((hₙ/J)*D*ξ')'
     Dθ = θ .- ((hₙ/J)*D*θ')'
     #Implicit solve of partial step
-    I∇Rξ = cholesky(I + hₙ*∇Rξ)
+    # I∇Rξ = cholesky(Symmetric(I + hₙ*∇Rξ))
+    I∇Rξ = I + hₙ*∇Rξ
     ξ = I∇Rξ \ Dξ
     if parallel
         θ = reduce(hcat, 
