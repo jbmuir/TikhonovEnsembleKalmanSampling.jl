@@ -1,4 +1,4 @@
-function teks_update(u::Array{T,2}, y, Γ⁻¹, C₀⁻¹, G; 
+function teks_update(u::Array{T,2}, y, Γ, C₀, G; 
     parallel=false, 
     h₀=1, 
     iδ=100, 
@@ -17,9 +17,11 @@ function teks_update(u::Array{T,2}, y, Γ⁻¹, C₀⁻¹, G;
         g = reduce(hcat, map(G, eachcol(u)))
     end
     ḡ = mean(g, dims=2)
-    D = (g .- y)' * (Γ⁻¹ * (g .- ḡ))
+    D = (g .- y)' * (Γ \ (g .- ḡ))
     #Regularization/prior, adaptive stepsize, gradient step
-    ∇R = Cu*C₀⁻¹
+    # ∇R = Cu*C₀⁻¹
+    ∇R = (C₀\Cu')' # because both are symmetric you can do this...
+
     hₙ = h₀ / (norm(D) + 1/iδ)
     Du = u .- ((hₙ/J)*D*u')'
     #Implicit solve of partial step
@@ -31,7 +33,7 @@ function teks_update(u::Array{T,2}, y, Γ⁻¹, C₀⁻¹, G;
     return (u, hₙ)
 end
 
-function teks(u::Array{T,2}, y, Γ⁻¹, C₀⁻¹, G, n_steps; 
+function teks(u::Array{T,2}, y, Γ, C₀⁻¹, G, n_steps; 
               parallel=false, 
               h₀=1, 
               iδ=100, 
@@ -43,7 +45,7 @@ function teks(u::Array{T,2}, y, Γ⁻¹, C₀⁻¹, G, n_steps;
     end
     hₙchain = T[]
     for i = 1:n_steps
-        u, hₙ = teks_update(u, y, Γ⁻¹, C₀⁻¹, G; 
+        u, hₙ = teks_update(u, y, Γ, C₀⁻¹, G; 
                             parallel=parallel, 
                             h₀=h₀, 
                             iδ=iδ, 
@@ -68,7 +70,7 @@ function implicit_hyper_solve(θΔθ, Cθ, hₙ, ∇nlpθ_fun; solver=NelderMead
     return Optim.minimizer(res)
 end
 
-function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_fun; 
+function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun; 
                         parallel=false, 
                         h₀=1, 
                         iδ=100, 
@@ -90,7 +92,7 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_
         g = reduce(hcat, map(GT, zip(eachcol(ξ), eachcol(θ))))
     end
     ḡ = mean(g, dims=2)
-    D = (g .- y)' * (Γ⁻¹*(g .- ḡ))
+    D = (g .- y)' * (Γ \ (g .- ḡ))
     #Regularization / prior and adaptive stepsize, gradient step
     ∇Rξ = Cξ
     hₙ = h₀ / (norm(D) + 1/iδ)
