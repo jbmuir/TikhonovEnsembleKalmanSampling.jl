@@ -20,7 +20,7 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     D = (g .- y)' * (Γ \ (g .- ḡ))
     #Regularization/prior, adaptive stepsize, gradient step
     # ∇R = Cu*C₀⁻¹
-    ∇R = (C₀\Cu')' # because both are symmetric you can do this...
+    ∇R = (C₀\ Cu')' # because both are symmetric you can do this...
 
     hₙ = h₀ / (norm(D) + 1/iδ)
     Du = u .- ((hₙ/J)*D*u')'
@@ -30,7 +30,7 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     u = I∇R \ Du
     # perturb parameters according to i-step sample covariance
     Wu = randn(T, size(u))
-    u .+= sqrt(2*hₙ)*Cuc.U*Wu
+    u .+= sqrt(2*hₙ)*Cuc.L*Wu
     return (u, hₙ)
 end
 
