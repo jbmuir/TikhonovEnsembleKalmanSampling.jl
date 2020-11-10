@@ -115,8 +115,8 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun;
     # perturb parameters according to i-step sample covariance
     Wξ = randn(T, size(ξ))
     Wθ = randn(T, size(θ))
-    ξ .+= sqrt(2*hₙ)*Cξc.U*Wξ
-    θ .+= sqrt(2*hₙ)*Cθc.U*Wθ
+    ξ .+= sqrt(2*hₙ)*Cξc.L*Wξ
+    θ .+= sqrt(2*hₙ)*Cθc.L*Wθ
     return (ξ, θ, hₙ)
 end
 
