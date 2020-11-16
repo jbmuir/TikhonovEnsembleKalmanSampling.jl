@@ -1,5 +1,25 @@
+function add_noise!(x, W, C::CovarianceOperator{T}, hₙ, ϵ) where T
+    Cc = pheigfact(C)
+    x.+= sqrt(2*hₙ)*Cc[:vectors]*Diagonal(sqrt.(Cc[:values]))*Cc[:vectors]'*W
+end
+
+function add_noise!(x, W, C, hₙ, ϵ)
+    Cc = cholesky(C + ϵ*I)
+    x.+= sqrt(2*hₙ)*Cc.L*W
+end
+
+# function regularization_matrix(C₀, Cu::CovarianceOperator{T}) where T
+    
+# end
+
+
+# function regularization_matrix(C₀, Cu)
+
+# end
+
 function teks_update(u::Array{T,2}, y, Γ, C₀, G; 
     parallel=false, 
+    low_rank_approx=false,
     h₀=1, 
     iδ=100, 
     λ=1, 
@@ -7,9 +27,13 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
 
     J = size(u, 2)
     #calculate i-step sample covariance in parameter space
-    ū = mean(u, dims=2)
-    Cu = Symmetric((u .- ū)*(u .- ū)')/J
-    Cuc = cholesky(Cu + ϵ*I) 
+    if low_rank_approx
+        Cu = CovarianceOperator(u')
+    else
+        ū = mean(u, dims=2)
+        Cu = Symmetric((u .- ū)*(u .- ū)')/(J-1)
+    end
+    # Cuc = cholesky(Cu + ϵ*I) 
     # forward map and differencing operator
     if parallel
         g = reduce(hcat, pmap(G, eachcol(u)))
@@ -20,7 +44,11 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     D = (g .- y)' * (Γ \ (g .- ḡ))
     #Regularization/prior, adaptive stepsize, gradient step
     # ∇R = Cu*C₀⁻¹
-    ∇R = (C₀\ Cu')' # because both are symmetric you can do this...
+    # ∇R = regularization_matrix(C₀, Cu)
+    ∇R = (C₀\ Cu)' # because both are symmetric you can do this...
+    # ū = mean(u, dims=2)
+
+    # ∇R = (C₀\ Symmetric((u .- ū)*(u .- ū)')/(J-1))' # because both are symmetric you can do this...
 
     hₙ = h₀ / (norm(D) + 1/iδ)
     Du = u .- ((hₙ/J)*D*u')'
@@ -30,12 +58,14 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     u = I∇R \ Du
     # perturb parameters according to i-step sample covariance
     Wu = randn(T, size(u))
-    u .+= sqrt(2*hₙ)*Cuc.L*Wu
-    return (u, hₙ)
+    # u .+= sqrt(2*hₙ)*Cuc.L*Wu
+    add_noise!(u, Wu, Cu, hₙ, ϵ)
+    return (u, hₙ, g)
 end
 
 function teks(u::Array{T,2}, y, Γ, C₀⁻¹, G, n_steps; 
               parallel=false, 
+              low_rank_approx=false,
               h₀=1, 
               iδ=100, 
               λ=1, 
@@ -46,8 +76,9 @@ function teks(u::Array{T,2}, y, Γ, C₀⁻¹, G, n_steps;
     end
     hₙchain = T[]
     for i = 1:n_steps
-        u, hₙ = teks_update(u, y, Γ, C₀⁻¹, G; 
+        u, hₙ, _ = teks_update(u, y, Γ, C₀⁻¹, G; 
                             parallel=parallel, 
+                            low_rank_approx=low_rank_approx,
                             h₀=h₀, 
                             iδ=iδ, 
                             λ=λ, 
@@ -82,8 +113,8 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun;
     #calculate i-step sample covariance in parameter space & update parameters
     ξ̄ = mean(ξ, dims=2)
     θ̄ = mean(θ, dims=2)
-    Cξ = Symmetric((ξ .- ξ̄)*(ξ .- ξ̄)')/J
-    Cθ = Symmetric((θ .- θ̄)*(θ .- θ̄)')/J
+    Cξ = Symmetric((ξ .- ξ̄)*(ξ .- ξ̄)')/(J-1)
+    Cθ = Symmetric((θ .- θ̄)*(θ .- θ̄)')/(J-1)
     Cξc = cholesky(Cξ + ϵ*I)
     Cθc = cholesky(Cθ + ϵ*I) 
     # forward map and differencing operator
@@ -117,7 +148,7 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun;
     Wθ = randn(T, size(θ))
     ξ .+= sqrt(2*hₙ)*Cξc.L*Wξ
     θ .+= sqrt(2*hₙ)*Cθc.L*Wθ
-    return (ξ, θ, hₙ)
+    return (ξ, θ, hₙ, g)
 end
 
 function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_fun, n_steps; 
@@ -136,7 +167,7 @@ function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_fun, n_
     hₙchain = T[]
     J = size(ξ, 2)
     for i = 1:n_steps
-        ξ, θ, hₙ = whteks_update(ξ, θ, y, Γ⁻¹, GT, ∇nlpθ_fun; 
+        ξ, θ, hₙ, _ = whteks_update(ξ, θ, y, Γ⁻¹, GT, ∇nlpθ_fun; 
                                 parallel=parallel, 
                                 h₀=h₀, 
                                 iδ=iδ, 

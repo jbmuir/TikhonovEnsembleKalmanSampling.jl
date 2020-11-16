@@ -4,6 +4,8 @@ using Distributed
 using Statistics
 using LinearAlgebra
 using Optim
+using EmpiricalCovarianceOperators
+using LowRankApprox
 
 include("sampling.jl")
 
