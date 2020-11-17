@@ -1,25 +1,10 @@
-function add_noise!(x, W, C::CovarianceOperator{T}, hₙ, ϵ) where T
-    Cc = pheigfact(C)
-    x.+= sqrt(2*hₙ)*Cc[:vectors]*Diagonal(sqrt.(Cc[:values]))*Cc[:vectors]'*W
-end
-
 function add_noise!(x, W, C, hₙ, ϵ)
     Cc = cholesky(C + ϵ*I)
     x.+= sqrt(2*hₙ)*Cc.L*W
 end
 
-# function regularization_matrix(C₀, Cu::CovarianceOperator{T}) where T
-    
-# end
-
-
-# function regularization_matrix(C₀, Cu)
-
-# end
-
 function teks_update(u::Array{T,2}, y, Γ, C₀, G; 
     parallel=false, 
-    low_rank_approx=false,
     h₀=1, 
     iδ=100, 
     λ=1, 
@@ -27,13 +12,8 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
 
     J = size(u, 2)
     #calculate i-step sample covariance in parameter space
-    if low_rank_approx
-        Cu = CovarianceOperator(u')
-    else
-        ū = mean(u, dims=2)
-        Cu = Symmetric((u .- ū)*(u .- ū)')/(J-1)
-    end
-    # Cuc = cholesky(Cu + ϵ*I) 
+    ū = mean(u, dims=2)
+    Cu = Symmetric((u .- ū)*(u .- ū)')/(J-1)
     # forward map and differencing operator
     if parallel
         g = reduce(hcat, pmap(G, eachcol(u)))
@@ -43,17 +23,10 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     ḡ = mean(g, dims=2)
     D = (g .- y)' * (Γ \ (g .- ḡ))
     #Regularization/prior, adaptive stepsize, gradient step
-    # ∇R = Cu*C₀⁻¹
-    # ∇R = regularization_matrix(C₀, Cu)
     ∇R = (C₀\ Cu)' # because both are symmetric you can do this...
-    # ū = mean(u, dims=2)
-
-    # ∇R = (C₀\ Symmetric((u .- ū)*(u .- ū)')/(J-1))' # because both are symmetric you can do this...
-
     hₙ = h₀ / (norm(D) + 1/iδ)
     Du = u .- ((hₙ/J)*D*u')'
     #Implicit solve of partial step
-    # I∇R = cholesky(Symmetric(I + hₙ*∇R))
     I∇R = I + hₙ*∇R
     u = I∇R \ Du
     # perturb parameters according to i-step sample covariance
@@ -65,7 +38,6 @@ end
 
 function teks(u::Array{T,2}, y, Γ, C₀⁻¹, G, n_steps; 
               parallel=false, 
-              low_rank_approx=false,
               h₀=1, 
               iδ=100, 
               λ=1, 
@@ -78,7 +50,6 @@ function teks(u::Array{T,2}, y, Γ, C₀⁻¹, G, n_steps;
     for i = 1:n_steps
         u, hₙ, _ = teks_update(u, y, Γ, C₀⁻¹, G; 
                             parallel=parallel, 
-                            low_rank_approx=low_rank_approx,
                             h₀=h₀, 
                             iδ=iδ, 
                             λ=λ, 
