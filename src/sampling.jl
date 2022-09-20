@@ -36,7 +36,7 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     return (u, hₙ, g)
 end
 
-function teks(u::Array{T,2}, y, Γ, C₀⁻¹, G, n_steps; 
+function teks(u::Array{T,2}, y, Γ, C₀, G, n_steps; 
               parallel=false, 
               h₀=1, 
               iδ=100, 
@@ -48,7 +48,7 @@ function teks(u::Array{T,2}, y, Γ, C₀⁻¹, G, n_steps;
     end
     hₙchain = T[]
     for i = 1:n_steps
-        u, hₙ, _ = teks_update(u, y, Γ, C₀⁻¹, G; 
+        u, hₙ, _ = teks_update(u, y, Γ, C₀, G; 
                             parallel=parallel, 
                             h₀=h₀, 
                             iδ=iδ, 
@@ -122,7 +122,7 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun;
     return (ξ, θ, hₙ, g)
 end
 
-function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_fun, n_steps; 
+function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun, n_steps; 
                 parallel=false, 
                 h₀=1, 
                 iδ=100, 
@@ -138,7 +138,7 @@ function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ⁻¹, GT, ∇nlpθ_fun, n_
     hₙchain = T[]
     J = size(ξ, 2)
     for i = 1:n_steps
-        ξ, θ, hₙ, _ = whteks_update(ξ, θ, y, Γ⁻¹, GT, ∇nlpθ_fun; 
+        ξ, θ, hₙ, _ = whteks_update(ξ, θ, y, Γ, GT, ∇nlpθ_fun; 
                                 parallel=parallel, 
                                 h₀=h₀, 
                                 iδ=iδ, 
