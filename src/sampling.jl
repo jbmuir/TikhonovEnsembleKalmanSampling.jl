@@ -8,7 +8,7 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     h₀=1, 
     iδ=100, 
     λ=1, 
-    ϵ=convert(T, 1e-10)) where T
+    ϵ=convert(T, 1e-10), adapt_h=true) where T
 
     J = size(u, 2)
     #calculate i-step sample covariance in parameter space
@@ -24,7 +24,11 @@ function teks_update(u::Array{T,2}, y, Γ, C₀, G;
     D = (g .- y)' * (Γ \ (g .- ḡ))
     #Regularization/prior, adaptive stepsize, gradient step
     ∇R = (C₀\ Cu)' # because both are symmetric you can do this...
-    hₙ = h₀ / (norm(D) + 1/iδ)
+    if adapt_h
+        hₙ = h₀ / (norm(D) + 1/iδ)
+    else
+        hₙ = h₀ 
+    end
     Du = u .- ((hₙ/J)*D*u')'
     #Implicit solve of partial step
     I∇R = I + hₙ*∇R
@@ -42,7 +46,7 @@ function teks(u::Array{T,2}, y, Γ, C₀, G, n_steps;
               iδ=100, 
               λ=1, 
               ϵ=convert(T, 1e-10), 
-              savechain=false) where T
+              savechain=false, adapt_h=true) where T
     if savechain
         uchain = Array{T,2}[]
     end
@@ -53,7 +57,7 @@ function teks(u::Array{T,2}, y, Γ, C₀, G, n_steps;
                             h₀=h₀, 
                             iδ=iδ, 
                             λ=λ, 
-                            ϵ=ϵ)
+                            ϵ=ϵ, adapt_h)
         if savechain
             push!(uchain, u)
         end
@@ -79,7 +83,7 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun;
                         iδ=100, 
                         λ=1, 
                         ϵ=convert(T, 1e-10), 
-                        hyper_solver=NelderMead()) where T
+                        hyper_solver=NelderMead(), adapt_h=true) where T
     J = size(ξ, 2)
     #calculate i-step sample covariance in parameter space & update parameters
     ξ̄ = mean(ξ, dims=2)
@@ -98,7 +102,11 @@ function whteks_update(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun;
     D = (g .- y)' * (Γ \ (g .- ḡ))
     #Regularization / prior and adaptive stepsize, gradient step
     ∇Rξ = Cξ
-    hₙ = h₀ / (norm(D) + 1/iδ)
+    if adapt_h
+        hₙ = h₀ / (norm(D) + 1/iδ)
+    else
+        hₙ = h₀ 
+    end
     Dξ = ξ .- ((hₙ/J)*D*ξ')'
     Dθ = θ .- ((hₙ/J)*D*θ')'
     #Implicit solve of partial step
@@ -129,7 +137,7 @@ function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun, n_steps
                 λ=1, 
                 ϵ=convert(T, 1e-10), 
                 savechain=false,
-                hyper_solver=NelderMead()) where T
+                hyper_solver=NelderMead(), adapt_h=true) where T
     
     if savechain
         ξchain = Array{T,2}[]
@@ -144,7 +152,7 @@ function whteks(ξ::Array{T,2}, θ::Array{T,2}, y, Γ, GT, ∇nlpθ_fun, n_steps
                                 iδ=iδ, 
                                 λ=λ, 
                                 ϵ=ϵ, 
-                                hyper_solver=hyper_solver)
+                                hyper_solver=hyper_solver, adapt_h=adapt_h)
         if savechain
             push!(ξchain, ξ)
             push!(θchain, θ)
